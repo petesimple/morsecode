@@ -300,7 +300,37 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
-  </style>
+  
+    .mic-light {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #343f4f;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.04);
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    .mic-light.hot {
+      background: var(--good);
+      box-shadow: 0 0 18px rgba(110,231,168,.75), 0 0 0 4px rgba(110,231,168,.14);
+    }
+
+    .level-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .level-number {
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      min-width: 54px;
+      text-align: right;
+    }
+</style>
 </head>
 <body>
   <main class="app">
@@ -370,6 +400,41 @@
     </section>
 
     <section class="card" style="margin-top:16px;">
+      <h2>Microphone Listener</h2>
+      <div class="row two">
+        <div>
+          <p class="status"><span id="micLight" class="mic-light"></span><span id="micStatus">Mic listener is off.</span></p>
+          <div class="level-wrap">
+            <div class="meter"><span id="micLevelMeter"></span></div>
+            <div class="level-number" id="micLevelNumber">0%</div>
+          </div>
+          <div class="row two">
+            <div>
+              <label for="micThreshold">Tone threshold</label>
+              <input id="micThreshold" type="range" min="1" max="80" step="1" value="18" />
+            </div>
+            <div>
+              <label for="micUnitMs">Mic unit ms</label>
+              <input id="micUnitMs" type="number" min="30" max="500" step="10" value="120" />
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="primary" id="startMicBtn">Start Mic Listener</button>
+            <button class="danger" id="stopMicBtn">Stop Mic</button>
+            <button id="resetMicBtn">Reset Mic Decode</button>
+          </div>
+          <p class="tiny">Best results: play a clear single Morse tone near the device, reduce background noise, then adjust the threshold until the light turns green only during the beep.</p>
+        </div>
+        <div>
+          <label>Mic symbol buffer</label>
+          <div class="output" id="micSymbolBuffer"></div>
+          <label>Mic decoded message</label>
+          <div class="output" id="micDecoded"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
       <h2>Settings</h2>
       <div class="row four">
         <div>
@@ -434,7 +499,15 @@
       volume: document.getElementById('volume'),
       assignedKey: document.getElementById('assignedKey'),
       reference: document.getElementById('reference'),
-      toast: document.getElementById('toast')
+      toast: document.getElementById('toast'),
+      micLight: document.getElementById('micLight'),
+      micStatus: document.getElementById('micStatus'),
+      micLevelMeter: document.getElementById('micLevelMeter'),
+      micLevelNumber: document.getElementById('micLevelNumber'),
+      micThreshold: document.getElementById('micThreshold'),
+      micUnitMs: document.getElementById('micUnitMs'),
+      micSymbolBuffer: document.getElementById('micSymbolBuffer'),
+      micDecoded: document.getElementById('micDecoded')
     };
 
     let audioCtx = null;
@@ -449,6 +522,20 @@
     let decoded = '';
     let gapTimer = null;
     let meterTimer = null;
+
+    let micStream = null;
+    let micSource = null;
+    let micAnalyser = null;
+    let micData = null;
+    let micListening = false;
+    let micWasHot = false;
+    let micToneStart = 0;
+    let micToneEnd = 0;
+    let micSymbols = '';
+    let micDecoded = '';
+    let micGapCommitted = false;
+    let micWordGapCommitted = false;
+    let micRaf = null;
 
     function ditMs() {
       const wpm = clamp(Number(els.wpm.value) || 18, 5, 40);
@@ -639,7 +726,9 @@
         wpm: els.wpm.value,
         toneHz: els.toneHz.value,
         volume: els.volume.value,
-        assignedCode
+        assignedCode,
+        micThreshold: els.micThreshold.value,
+        micUnitMs: els.micUnitMs.value
       };
       localStorage.setItem('morseSettings', JSON.stringify(settings));
       localStorage.setItem('morseAssignedCode', assignedCode);
@@ -653,6 +742,8 @@
         if (settings.toneHz) els.toneHz.value = settings.toneHz;
         if (settings.volume) els.volume.value = settings.volume;
         if (settings.assignedCode) assignedCode = settings.assignedCode;
+        if (settings.micThreshold) els.micThreshold.value = settings.micThreshold;
+        if (settings.micUnitMs) els.micUnitMs.value = settings.micUnitMs;
       } catch (e) {}
       els.assignedKey.value = assignedCode;
     }
@@ -663,8 +754,138 @@
       els.wpm.value = 18;
       els.toneHz.value = 650;
       els.volume.value = .35;
+      els.micThreshold.value = 18;
+      els.micUnitMs.value = 120;
       saveSettings();
       showToast('Settings reset');
+    }
+
+    function micUnit() {
+      return clamp(Number(els.micUnitMs.value) || ditMs(), 30, 500);
+    }
+
+    async function startMicListener() {
+      try {
+        const ctx = getAudio();
+        await ctx.resume();
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        });
+        micSource = ctx.createMediaStreamSource(micStream);
+        micAnalyser = ctx.createAnalyser();
+        micAnalyser.fftSize = 2048;
+        micAnalyser.smoothingTimeConstant = .12;
+        micData = new Uint8Array(micAnalyser.fftSize);
+        micSource.connect(micAnalyser);
+        micListening = true;
+        micWasHot = false;
+        micToneStart = 0;
+        micToneEnd = performance.now();
+        els.micStatus.textContent = 'Mic listener is running.';
+        showToast('Mic listener started');
+        analyzeMic();
+      } catch (err) {
+        els.micStatus.textContent = 'Mic permission failed or microphone is unavailable.';
+        showToast('Mic permission failed');
+      }
+    }
+
+    function stopMicListener() {
+      micListening = false;
+      if (micRaf) cancelAnimationFrame(micRaf);
+      if (micSource) {
+        try { micSource.disconnect(); } catch (e) {}
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+      }
+      micStream = null;
+      micSource = null;
+      micAnalyser = null;
+      micData = null;
+      micWasHot = false;
+      els.micLight.classList.remove('hot');
+      els.micLevelMeter.style.width = '0%';
+      els.micLevelNumber.textContent = '0%';
+      els.micStatus.textContent = 'Mic listener is off.';
+    }
+
+    function analyzeMic() {
+      if (!micListening || !micAnalyser || !micData) return;
+      micAnalyser.getByteTimeDomainData(micData);
+      let sum = 0;
+      for (let i = 0; i < micData.length; i++) {
+        const v = (micData[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / micData.length);
+      const level = clamp(rms * 300, 0, 100);
+      const threshold = clamp(Number(els.micThreshold.value) || 18, 1, 80);
+      const hot = level >= threshold;
+      const now = performance.now();
+
+      els.micLevelMeter.style.width = level.toFixed(0) + '%';
+      els.micLevelNumber.textContent = level.toFixed(0) + '%';
+      els.micLight.classList.toggle('hot', hot);
+
+      if (hot && !micWasHot) {
+        micToneStart = now;
+        micGapCommitted = false;
+        micWordGapCommitted = false;
+        els.micStatus.textContent = 'Tone detected.';
+      }
+
+      if (!hot && micWasHot) {
+        const duration = now - micToneStart;
+        micToneEnd = now;
+        const symbol = duration < micUnit() * 2 ? '.' : '-';
+        micSymbols += symbol;
+        els.micSymbolBuffer.textContent = micSymbols;
+        els.micStatus.textContent = `Heard ${symbol === '.' ? 'dot' : 'dash'} from ${Math.round(duration)} ms tone.`;
+      }
+
+      if (!hot && micToneEnd > 0) {
+        const silence = now - micToneEnd;
+        if (micSymbols && !micGapCommitted && silence >= micUnit() * 3) {
+          commitMicLetter();
+          micGapCommitted = true;
+        }
+        if (micDecoded && !micWordGapCommitted && silence >= micUnit() * 7) {
+          if (!micDecoded.endsWith(' ')) micDecoded += ' ';
+          renderMicDecode();
+          micWordGapCommitted = true;
+          els.micStatus.textContent = 'Word gap heard.';
+        }
+      }
+
+      micWasHot = hot;
+      micRaf = requestAnimationFrame(analyzeMic);
+    }
+
+    function commitMicLetter() {
+      if (!micSymbols) return;
+      micDecoded += REVERSE[micSymbols] || '?';
+      micSymbols = '';
+      els.micSymbolBuffer.textContent = '';
+      renderMicDecode();
+    }
+
+    function renderMicDecode() {
+      els.micDecoded.textContent = micDecoded;
+    }
+
+    function resetMicDecode() {
+      micSymbols = '';
+      micDecoded = '';
+      micGapCommitted = false;
+      micWordGapCommitted = false;
+      els.micSymbolBuffer.textContent = '';
+      renderMicDecode();
+      els.micStatus.textContent = micListening ? 'Mic decode reset. Keep the beeps coming.' : 'Mic decode reset.';
     }
 
     function renderReference() {
@@ -721,6 +942,11 @@
     document.getElementById('backspaceLiveBtn').addEventListener('click', backspaceLive);
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
     document.getElementById('resetSettingsBtn').addEventListener('click', resetSettings);
+    document.getElementById('startMicBtn').addEventListener('click', startMicListener);
+    document.getElementById('stopMicBtn').addEventListener('click', stopMicListener);
+    document.getElementById('resetMicBtn').addEventListener('click', resetMicDecode);
+    els.micThreshold.addEventListener('change', saveSettings);
+    els.micUnitMs.addEventListener('change', saveSettings);
 
     document.getElementById('learnKeyBtn').addEventListener('click', () => {
       learningKey = true;

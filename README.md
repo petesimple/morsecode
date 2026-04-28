@@ -10,7 +10,7 @@ Live App
 
 Add your GitHub Pages link here after publishing:
 
-https://yourusername.github.io/morse-code-trainer/
+petesimple.github.io/morsecode/
 
 Features
 

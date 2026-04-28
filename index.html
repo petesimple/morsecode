@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Morse Code Trainer</title>
+  <style>
+    :root {
+      --bg: #070b10;
+      --panel: #111923;
+      --panel2: #182433;
+      --text: #f2f7ff;
+      --muted: #9fb0c4;
+      --line: #2b3a4d;
+      --accent: #58d1ff;
+      --accent2: #ffd166;
+      --good: #6ee7a8;
+      --bad: #ff6b6b;
+      --shadow: 0 18px 45px rgba(0,0,0,.35);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(88, 209, 255, .15), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(255, 209, 102, .12), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      padding: max(16px, env(safe-area-inset-top)) 16px max(22px, env(safe-area-inset-bottom));
+    }
+
+    .app {
+      width: min(1100px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 10px 0 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 7vw, 4.5rem);
+      line-height: .92;
+      letter-spacing: -0.06em;
+    }
+
+    .tagline {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 680px;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, rgba(88,209,255,.16), rgba(255,209,102,.12));
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--accent2);
+      font-weight: 800;
+      box-shadow: var(--shadow);
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 900px) {
+      .grid.two { grid-template-columns: 1fr 1fr; }
+      .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    .card {
+      background: rgba(17, 25, 35, .94);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 1.15rem;
+      letter-spacing: .02em;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 7px;
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    textarea, input, select {
+      width: 100%;
+      color: var(--text);
+      background: #071019;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 13px;
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 112px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    textarea:focus, input:focus, select:focus {
+      border-color: rgba(88,209,255,.8);
+      box-shadow: 0 0 0 4px rgba(88,209,255,.12);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    @media (min-width: 620px) {
+      .row.two { grid-template-columns: 1fr 1fr; }
+      .row.three { grid-template-columns: 1fr 1fr 1fr; }
+      .row.four { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      background: var(--panel2);
+      color: var(--text);
+      font-weight: 900;
+      font-size: .96rem;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(0,0,0,.25);
+      transition: transform .08s ease, filter .12s ease, background .12s ease;
+      touch-action: manipulation;
+    }
+
+    button:hover { filter: brightness(1.09); }
+    button:active { transform: translateY(1px) scale(.99); }
+
+    button.primary {
+      background: linear-gradient(135deg, #1fb6ff, #58d1ff);
+      color: #041018;
+    }
+
+    button.gold {
+      background: linear-gradient(135deg, #ffd166, #ffe29b);
+      color: #171007;
+    }
+
+    button.danger {
+      background: #44202a;
+      color: #ffd5dc;
+    }
+
+    .output {
+      min-height: 56px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #071019;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 13px;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      line-height: 1.5;
+    }
+
+    .big-key {
+      width: 100%;
+      min-height: 170px;
+      border-radius: 28px;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      letter-spacing: .05em;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255,255,255,.22), transparent 5rem),
+        linear-gradient(160deg, #193248, #0f1b28);
+      border: 1px solid rgba(88,209,255,.35);
+      color: var(--accent2);
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .big-key.down {
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255,255,255,.36), transparent 7rem),
+        linear-gradient(160deg, #ffd166, #ffb703);
+      color: #130f05;
+      transform: scale(.992);
+    }
+
+    .meter {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #071019;
+      border: 1px solid var(--line);
+      margin: 12px 0;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width .08s linear;
+    }
+
+    .status {
+      color: var(--muted);
+      font-size: .92rem;
+      min-height: 1.3em;
+      margin-top: 9px;
+    }
+
+    .pillbox {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--muted);
+      font-size: .84rem;
+      font-weight: 700;
+    }
+
+    .live-letter {
+      color: var(--accent2);
+      font-weight: 900;
+    }
+
+    .tiny {
+      font-size: .82rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      margin: 18px 0 6px;
+      font-size: .85rem;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(20px);
+      background: #06111b;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 99;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>Morse Code Trainer</h1>
+        <p class="tagline">Type, hear, tap, decode, and practice Morse from a keyboard, touch screen, or assigned key.</p>
+      </div>
+      <div class="badge">CQ CQ CQ</div>
+    </header>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>Text to Morse</h2>
+        <label for="plainText">Plain text</label>
+        <textarea id="plainText" placeholder="Type something like SOS Pete"></textarea>
+        <div class="button-row">
+          <button class="primary" id="toMorseBtn">Convert to Morse</button>
+          <button class="gold" id="playTextBtn">Play Morse</button>
+          <button id="copyMorseBtn">Copy Morse</button>
+        </div>
+        <label for="morseOutput">Morse output</label>
+        <div class="output" id="morseOutput"></div>
+      </article>
+
+      <article class="card">
+        <h2>Morse to Text</h2>
+        <label for="morseInput">Morse input</label>
+        <textarea id="morseInput" placeholder=".... . .-.. .-.. --- / .--. . - ."></textarea>
+        <div class="button-row">
+          <button class="primary" id="toTextBtn">Decode to Text</button>
+          <button id="clearTextBtn">Clear</button>
+        </div>
+        <label>Text output</label>
+        <div class="output" id="textOutput"></div>
+        <p class="tiny">Use spaces between letters and slash between words.</p>
+      </article>
+    </section>
+
+    <section class="grid two" style="margin-top:16px;">
+      <article class="card">
+        <h2>Manual Key</h2>
+        <button id="tapButton" class="big-key">PRESS AND HOLD</button>
+        <div class="meter"><span id="holdMeter"></span></div>
+        <div class="status" id="keyStatus">Use the button or your assigned key.</div>
+        <div class="button-row">
+          <button class="danger" id="resetLiveBtn">Reset Live Decode</button>
+          <button id="insertWordGapBtn">Word Gap</button>
+          <button id="backspaceLiveBtn">Backspace</button>
+        </div>
+        <label>Live symbol buffer</label>
+        <div class="output" id="symbolBuffer"></div>
+      </article>
+
+      <article class="card">
+        <h2>Live Decode</h2>
+        <label>Decoded message</label>
+        <div class="output" id="liveDecoded"></div>
+        <div class="pillbox">
+          <span class="pill">Dot: short press</span>
+          <span class="pill">Dash: long press</span>
+          <span class="pill">Letter gap: pause</span>
+          <span class="pill">Word gap: longer pause</span>
+        </div>
+        <p class="tiny">The app watches your press and release timing. It turns short presses into dots, long presses into dashes, and pauses into letter or word breaks.</p>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>Settings</h2>
+      <div class="row four">
+        <div>
+          <label for="wpm">Speed WPM</label>
+          <input id="wpm" type="number" min="5" max="40" step="1" value="18" />
+        </div>
+        <div>
+          <label for="toneHz">Tone Hz</label>
+          <input id="toneHz" type="number" min="250" max="1200" step="10" value="650" />
+        </div>
+        <div>
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="1" step="0.01" value="0.35" />
+        </div>
+        <div>
+          <label for="assignedKey">Assigned key</label>
+          <input id="assignedKey" value="Space" readonly />
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="learnKeyBtn">Assign New Key</button>
+        <button id="saveSettingsBtn">Save Settings</button>
+        <button id="resetSettingsBtn">Reset Settings</button>
+      </div>
+      <p class="tiny">Tip: Click Assign New Key, then press the keyboard key or controller button you want to use. Spacebar is the default.</p>
+    </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>Quick Reference</h2>
+      <div class="output" id="reference"></div>
+    </section>
+
+    <div class="footer">Built for GitHub Pages. No login. No backend. Just dots, dashes, and beautiful nerd lightning.</div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const MORSE = {
+      A: '.-', B: '-...', C: '-.-.', D: '-..', E: '.', F: '..-.', G: '--.', H: '....', I: '..', J: '.---',
+      K: '-.-', L: '.-..', M: '--', N: '-.', O: '---', P: '.--.', Q: '--.-', R: '.-.', S: '...', T: '-',
+      U: '..-', V: '...-', W: '.--', X: '-..-', Y: '-.--', Z: '--..',
+      0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....', 7: '--...', 8: '---..', 9: '----.',
+      '.': '.-.-.-', ',': '--..--', '?': '..--..', "'": '.----.', '!': '-.-.--', '/': '-..-.', '(': '-.--.', ')': '-.--.-',
+      '&': '.-...', ':': '---...', ';': '-.-.-.', '=': '-...-', '+': '.-.-.', '-': '-....-', '_': '..--.-', '"': '.-..-.', '$': '...-..-', '@': '.--.-.'
+    };
+
+    const REVERSE = Object.fromEntries(Object.entries(MORSE).map(([k, v]) => [v, k]));
+
+    const els = {
+      plainText: document.getElementById('plainText'),
+      morseOutput: document.getElementById('morseOutput'),
+      morseInput: document.getElementById('morseInput'),
+      textOutput: document.getElementById('textOutput'),
+      tapButton: document.getElementById('tapButton'),
+      keyStatus: document.getElementById('keyStatus'),
+      holdMeter: document.getElementById('holdMeter'),
+      symbolBuffer: document.getElementById('symbolBuffer'),
+      liveDecoded: document.getElementById('liveDecoded'),
+      wpm: document.getElementById('wpm'),
+      toneHz: document.getElementById('toneHz'),
+      volume: document.getElementById('volume'),
+      assignedKey: document.getElementById('assignedKey'),
+      reference: document.getElementById('reference'),
+      toast: document.getElementById('toast')
+    };
+
+    let audioCtx = null;
+    let osc = null;
+    let gain = null;
+    let assignedCode = localStorage.getItem('morseAssignedCode') || 'Space';
+    let learningKey = false;
+    let keyIsDown = false;
+    let pressStart = 0;
+    let lastRelease = 0;
+    let currentSymbols = '';
+    let decoded = '';
+    let gapTimer = null;
+    let meterTimer = null;
+
+    function ditMs() {
+      const wpm = clamp(Number(els.wpm.value) || 18, 5, 40);
+      return 1200 / wpm;
+    }
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add('show');
+      setTimeout(() => els.toast.classList.remove('show'), 1600);
+    }
+
+    function getAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function startTone() {
+      const ctx = getAudio();
+      if (osc) return;
+      osc = ctx.createOscillator();
+      gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = clamp(Number(els.toneHz.value) || 650, 250, 1200);
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      gain.gain.setTargetAtTime(clamp(Number(els.volume.value) || .35, 0, 1), ctx.currentTime, .006);
+    }
+
+    function stopTone() {
+      if (!osc || !gain || !audioCtx) return;
+      const ctx = audioCtx;
+      gain.gain.setTargetAtTime(0, ctx.currentTime, .012);
+      const oldOsc = osc;
+      setTimeout(() => {
+        try { oldOsc.stop(); oldOsc.disconnect(); } catch (e) {}
+      }, 55);
+      osc = null;
+      gain = null;
+    }
+
+    function textToMorse(text) {
+      return text
+        .toUpperCase()
+        .split('')
+        .map(ch => ch === ' ' ? '/' : MORSE[ch] || '')
+        .filter(Boolean)
+        .join(' ');
+    }
+
+    function morseToText(morse) {
+      return morse
+        .trim()
+        .split(/\s*\/\s*|\s{3,}/)
+        .map(word => word
+          .trim()
+          .split(/\s+/)
+          .map(code => REVERSE[code] || '')
+          .join('')
+        )
+        .join(' ')
+        .trim();
+    }
+
+    async function playMorse(morse) {
+      const unit = ditMs();
+      const ctx = getAudio();
+      await ctx.resume();
+      const tokens = morse.trim().split(/\s+/);
+      for (const token of tokens) {
+        if (token === '/') {
+          await sleep(unit * 4);
+          continue;
+        }
+        for (const symbol of token) {
+          startTone();
+          await sleep(symbol === '.' ? unit : unit * 3);
+          stopTone();
+          await sleep(unit);
+        }
+        await sleep(unit * 2);
+      }
+    }
+
+    function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+    function beginPress(source) {
+      if (keyIsDown) return;
+      keyIsDown = true;
+      pressStart = performance.now();
+      clearTimeout(gapTimer);
+      startTone();
+      els.tapButton.classList.add('down');
+      els.tapButton.textContent = 'SENDING';
+      els.keyStatus.textContent = source ? `Key down from ${source}` : 'Key down';
+      updateMeter();
+    }
+
+    function endPress() {
+      if (!keyIsDown) return;
+      keyIsDown = false;
+      stopTone();
+      els.tapButton.classList.remove('down');
+      els.tapButton.textContent = 'PRESS AND HOLD';
+      const duration = performance.now() - pressStart;
+      lastRelease = performance.now();
+      const symbol = duration < ditMs() * 2 ? '.' : '-';
+      currentSymbols += symbol;
+      els.symbolBuffer.textContent = currentSymbols;
+      els.keyStatus.innerHTML = `Got <span class="live-letter">${symbol === '.' ? 'dot' : 'dash'}</span> from ${Math.round(duration)} ms press`;
+      els.holdMeter.style.width = '0%';
+      clearInterval(meterTimer);
+      scheduleGapDecode();
+    }
+
+    function updateMeter() {
+      clearInterval(meterTimer);
+      meterTimer = setInterval(() => {
+        if (!keyIsDown) return;
+        const elapsed = performance.now() - pressStart;
+        const pct = clamp((elapsed / (ditMs() * 3)) * 100, 0, 100);
+        els.holdMeter.style.width = pct + '%';
+      }, 30);
+    }
+
+    function scheduleGapDecode() {
+      clearTimeout(gapTimer);
+      const letterGap = ditMs() * 3;
+      const wordGap = ditMs() * 7;
+      gapTimer = setTimeout(() => {
+        commitLetter();
+        gapTimer = setTimeout(() => {
+          const since = performance.now() - lastRelease;
+          if (since >= wordGap && decoded && !decoded.endsWith(' ')) {
+            decoded += ' ';
+            renderLive();
+            els.keyStatus.textContent = 'Word gap detected';
+          }
+        }, wordGap - letterGap);
+      }, letterGap);
+    }
+
+    function commitLetter() {
+      if (!currentSymbols) return;
+      const letter = REVERSE[currentSymbols] || '?';
+      decoded += letter;
+      currentSymbols = '';
+      els.symbolBuffer.textContent = '';
+      renderLive();
+    }
+
+    function renderLive() {
+      els.liveDecoded.textContent = decoded;
+    }
+
+    function resetLive() {
+      currentSymbols = '';
+      decoded = '';
+      clearTimeout(gapTimer);
+      els.symbolBuffer.textContent = '';
+      renderLive();
+      els.keyStatus.textContent = 'Live decode reset. The puck, somehow, is also Morse code now.';
+    }
+
+    function backspaceLive() {
+      if (currentSymbols) {
+        currentSymbols = currentSymbols.slice(0, -1);
+        els.symbolBuffer.textContent = currentSymbols;
+      } else {
+        decoded = decoded.slice(0, -1);
+        renderLive();
+      }
+    }
+
+    function insertWordGap() {
+      commitLetter();
+      if (decoded && !decoded.endsWith(' ')) decoded += ' ';
+      renderLive();
+    }
+
+    function saveSettings() {
+      const settings = {
+        wpm: els.wpm.value,
+        toneHz: els.toneHz.value,
+        volume: els.volume.value,
+        assignedCode
+      };
+      localStorage.setItem('morseSettings', JSON.stringify(settings));
+      localStorage.setItem('morseAssignedCode', assignedCode);
+      showToast('Settings saved');
+    }
+
+    function loadSettings() {
+      try {
+        const settings = JSON.parse(localStorage.getItem('morseSettings') || '{}');
+        if (settings.wpm) els.wpm.value = settings.wpm;
+        if (settings.toneHz) els.toneHz.value = settings.toneHz;
+        if (settings.volume) els.volume.value = settings.volume;
+        if (settings.assignedCode) assignedCode = settings.assignedCode;
+      } catch (e) {}
+      els.assignedKey.value = assignedCode;
+    }
+
+    function resetSettings() {
+      assignedCode = 'Space';
+      els.assignedKey.value = assignedCode;
+      els.wpm.value = 18;
+      els.toneHz.value = 650;
+      els.volume.value = .35;
+      saveSettings();
+      showToast('Settings reset');
+    }
+
+    function renderReference() {
+      const lines = Object.entries(MORSE)
+        .filter(([k]) => /^[A-Z0-9]$/.test(k))
+        .map(([k, v]) => `${k} ${v}`);
+      els.reference.textContent = lines.join('   ');
+    }
+
+    document.getElementById('toMorseBtn').addEventListener('click', () => {
+      const morse = textToMorse(els.plainText.value);
+      els.morseOutput.textContent = morse;
+      els.morseInput.value = morse;
+    });
+
+    document.getElementById('playTextBtn').addEventListener('click', () => {
+      const morse = els.morseOutput.textContent.trim() || textToMorse(els.plainText.value);
+      els.morseOutput.textContent = morse;
+      if (morse) playMorse(morse);
+    });
+
+    document.getElementById('copyMorseBtn').addEventListener('click', async () => {
+      const morse = els.morseOutput.textContent.trim();
+      if (!morse) return showToast('Nothing to copy yet');
+      await navigator.clipboard.writeText(morse);
+      showToast('Morse copied');
+    });
+
+    document.getElementById('toTextBtn').addEventListener('click', () => {
+      els.textOutput.textContent = morseToText(els.morseInput.value);
+    });
+
+    document.getElementById('clearTextBtn').addEventListener('click', () => {
+      els.morseInput.value = '';
+      els.textOutput.textContent = '';
+    });
+
+    els.tapButton.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      els.tapButton.setPointerCapture(e.pointerId);
+      beginPress('screen tap');
+    });
+    els.tapButton.addEventListener('pointerup', e => {
+      e.preventDefault();
+      endPress();
+    });
+    els.tapButton.addEventListener('pointercancel', endPress);
+    els.tapButton.addEventListener('pointerleave', e => {
+      if (keyIsDown && e.pointerType === 'mouse') endPress();
+    });
+
+    document.getElementById('resetLiveBtn').addEventListener('click', resetLive);
+    document.getElementById('insertWordGapBtn').addEventListener('click', insertWordGap);
+    document.getElementById('backspaceLiveBtn').addEventListener('click', backspaceLive);
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+    document.getElementById('resetSettingsBtn').addEventListener('click', resetSettings);
+
+    document.getElementById('learnKeyBtn').addEventListener('click', () => {
+      learningKey = true;
+      els.assignedKey.value = 'Press any key...';
+      els.keyStatus.textContent = 'Waiting for your new send key.';
+    });
+
+    window.addEventListener('keydown', e => {
+      const active = document.activeElement;
+      const typing = active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
+
+      if (learningKey) {
+        e.preventDefault();
+        assignedCode = e.code;
+        els.assignedKey.value = assignedCode;
+        learningKey = false;
+        saveSettings();
+        showToast(`Assigned ${assignedCode}`);
+        return;
+      }
+
+      if (typing) return;
+
+      if (e.code === assignedCode) {
+        e.preventDefault();
+        beginPress(assignedCode);
+      }
+    });
+
+    window.addEventListener('keyup', e => {
+      const active = document.activeElement;
+      const typing = active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
+      if (typing) return;
+      if (e.code === assignedCode) {
+        e.preventDefault();
+        endPress();
+      }
+    });
+
+    window.addEventListener('gamepadconnected', e => {
+      showToast(`Gamepad connected: ${e.gamepad.id}`);
+    });
+
+    loadSettings();
+    renderReference();
+    els.plainText.value = 'SOS PETE';
+    els.morseOutput.textContent = textToMorse(els.plainText.value);
+  </script>
+</body>
+</html>

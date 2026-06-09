@@ -84,7 +84,6 @@
 
     @media (min-width: 900px) {
       .grid.two { grid-template-columns: 1fr 1fr; }
-      .grid.three { grid-template-columns: 1fr 1fr 1fr; }
     }
 
     .card {
@@ -140,7 +139,6 @@
 
     @media (min-width: 620px) {
       .row.two { grid-template-columns: 1fr 1fr; }
-      .row.three { grid-template-columns: 1fr 1fr 1fr; }
       .row.four { grid-template-columns: repeat(4, 1fr); }
     }
 
@@ -244,7 +242,7 @@
       margin-top: 9px;
     }
 
-    .pillbox {
+    .pillbox, .tree-hint {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -338,73 +336,114 @@
         #071019;
       border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 16px;
-      overflow-x: auto;
+      padding: 12px;
+      overflow: hidden;
     }
 
-    .morse-tree {
-      min-width: 740px;
-      display: grid;
-      gap: 16px;
-      padding: 8px 0;
+    .morse-map {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3 / 4.15;
+      min-height: 520px;
     }
 
-    .tree-row {
-      display: flex;
-      justify-content: center;
-      gap: 14px;
+    .morse-map svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
     }
 
-    .tree-node {
-      width: 52px;
-      height: 52px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.05);
-      color: var(--muted);
+    .map-line {
+      stroke: rgba(230,245,255,.76);
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+
+    .map-line.path {
+      stroke: rgba(255,209,102,.95);
+      stroke-width: 2.6;
+      filter: drop-shadow(0 0 3px rgba(255,209,102,.55));
+    }
+
+    .map-node {
+      position: absolute;
+      width: 8.4%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(230,245,255,.72);
+      background: rgba(120,150,135,.25);
+      color: var(--text);
       display: grid;
       place-items: center;
       font-weight: 950;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      position: relative;
+      box-shadow: 0 0 12px rgba(0,0,0,.25);
+      padding: 0;
+      z-index: 3;
     }
 
-    .tree-node.dash-node {
-      border-radius: 14px;
+    .map-node.dot {
+      border-radius: 999px;
     }
 
-    .tree-node.empty {
-      opacity: .18;
+    .map-node.dash {
+      border-radius: 7px;
     }
 
-    .tree-node.path {
-      border-color: var(--accent2);
-      color: var(--accent2);
-      box-shadow: 0 0 14px rgba(255,209,102,.16);
-    }
-
-    .tree-node.active {
+    .map-node.active {
       background: var(--good);
       color: #041018;
-      border-color: rgba(255,255,255,.65);
-      box-shadow: 0 0 24px rgba(110,231,168,.72);
+      box-shadow: 0 0 24px rgba(110,231,168,.75);
     }
 
-    .tree-node small {
+    .map-node.path {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+
+    .map-node .letter {
       position: absolute;
-      bottom: -14px;
+      font-size: clamp(.8rem, 3.2vw, 1.25rem);
+    }
+
+    .map-node .code {
+      position: absolute;
+      bottom: -18px;
+      font-size: .58rem;
+      color: var(--muted);
+    }
+
+    .morse-map-title {
+      position: absolute;
+      top: 1%;
       left: 50%;
       transform: translateX(-50%);
-      color: var(--muted);
-      font-size: .58rem;
-      opacity: .85;
+      letter-spacing: .12em;
+      font-weight: 900;
+      color: rgba(242,247,255,.82);
+      font-size: clamp(1rem, 4vw, 1.8rem);
+      white-space: nowrap;
+      z-index: 4;
     }
 
-    .tree-hint {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 12px;
+    .antenna {
+      position: absolute;
+      left: 50%;
+      top: 7.5%;
+      transform: translateX(-50%);
+      color: rgba(242,247,255,.75);
+      font-size: clamp(1.6rem, 6vw, 2.7rem);
+      z-index: 4;
+    }
+
+    @media (max-width: 520px) {
+      body { padding-left: 10px; padding-right: 10px; }
+      .card { padding: 14px; }
+      .morse-map { min-height: 470px; }
+      .map-node { width: 9.5%; }
+      .map-node .code { display: none; }
     }
   </style>
 </head>
@@ -500,7 +539,7 @@
       </div>
 
       <div class="morse-tree-shell">
-        <div class="morse-tree" id="morseTree"></div>
+        <div id="morseTree"></div>
       </div>
 
       <div class="tree-hint">
@@ -654,12 +693,50 @@
     let treeSymbols = '';
     let treeDecodedText = '';
 
-    const TREE_ROWS = [
-      ['E', 'T'],
-      ['I', 'A', 'N', 'M'],
-      ['S', 'U', 'R', 'W', 'D', 'K', 'G', 'O'],
-      ['H', 'V', 'F', '', 'L', '', 'P', 'J', 'B', 'X', 'C', 'Y', 'Z', 'Q', '', ''],
-      ['5', '4', '', '3', '', '', '', '2', '', '', '', '', '', '', '', '1', '6', '', '/', '', '', '', '', '', '7', '', '', '', '8', '', '9', '0']
+    const MAP_NODES = {
+      E: { code: '.', x: 55, y: 16, type: 'dot' },
+      I: { code: '..', x: 65, y: 16, type: 'dot' },
+      S: { code: '...', x: 75, y: 16, type: 'dot' },
+      H: { code: '....', x: 86, y: 16, type: 'dot' },
+
+      T: { code: '-', x: 45, y: 16, type: 'dash' },
+      M: { code: '--', x: 34, y: 16, type: 'dash' },
+      O: { code: '---', x: 21, y: 16, type: 'dash' },
+
+      U: { code: '..-', x: 65, y: 27, type: 'dash' },
+      F: { code: '..-.', x: 65, y: 37, type: 'dot' },
+      V: { code: '...-', x: 75, y: 27, type: 'dash' },
+
+      Q: { code: '--.-', x: 21, y: 27, type: 'dash' },
+      G: { code: '--.', x: 34, y: 31, type: 'dot' },
+      Z: { code: '--..', x: 34, y: 41, type: 'dot' },
+
+      N: { code: '-.', x: 45, y: 47, type: 'dot' },
+      D: { code: '-..', x: 45, y: 64, type: 'dot' },
+      B: { code: '-...', x: 45, y: 76, type: 'dot' },
+
+      K: { code: '-.-', x: 34, y: 54, type: 'dash' },
+      C: { code: '-.-.', x: 34, y: 64, type: 'dot' },
+      Y: { code: '-.--', x: 21, y: 54, type: 'dash' },
+      X: { code: '-..-', x: 29, y: 70, type: 'dash' },
+
+      A: { code: '.-', x: 55, y: 47, type: 'dash' },
+      R: { code: '.-.', x: 65, y: 47, type: 'dot' },
+      L: { code: '.-..', x: 75, y: 47, type: 'dot' },
+      W: { code: '.--', x: 55, y: 64, type: 'dash' },
+      P: { code: '.--.', x: 65, y: 64, type: 'dot' },
+      J: { code: '.---', x: 55, y: 76, type: 'dash' }
+    };
+
+    const MAP_LINES = [
+      ['O','M'], ['M','T'], ['T','E'], ['E','I'], ['I','S'], ['S','H'],
+      ['Q','G'], ['G','M'], ['G','Z'],
+      ['T','N'], ['N','D'], ['D','B'], ['D','X'],
+      ['N','K'], ['K','Y'], ['K','C'],
+      ['E','A'], ['A','W'], ['W','J'],
+      ['A','R'], ['R','L'],
+      ['I','U'], ['U','F'],
+      ['S','V']
     ];
 
     function ditMs() {
@@ -892,42 +969,84 @@
       showToast('Settings reset');
     }
 
+    function isNodeOnPath(code) {
+      if (!treeSymbols || !code) return false;
+      return treeSymbols.startsWith(code);
+    }
+
+    function isLineOnPath(a, b) {
+      if (!treeSymbols) return false;
+      const ca = MAP_NODES[a]?.code || '';
+      const cb = MAP_NODES[b]?.code || '';
+      return isNodeOnPath(ca) && isNodeOnPath(cb);
+    }
+
     function renderMorseTree() {
       els.morseTree.innerHTML = '';
 
-      TREE_ROWS.forEach(row => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'tree-row';
+      const map = document.createElement('div');
+      map.className = 'morse-map';
 
-        row.forEach(letter => {
-          const node = document.createElement('button');
-          const code = letter ? MORSE[letter] : '';
-          node.type = 'button';
-          node.className = 'tree-node';
+      const title = document.createElement('div');
+      title.className = 'morse-map-title';
+      title.textContent = 'MORSE  CODE';
+      map.appendChild(title);
 
-          if (!letter) node.classList.add('empty');
-          if (code.includes('-')) node.classList.add('dash-node');
-          if (code && treeSymbols.startsWith(code)) node.classList.add('path');
-          if (code && code === treeSymbols) node.classList.add('active');
+      const antenna = document.createElement('div');
+      antenna.className = 'antenna';
+      antenna.textContent = '⌁';
+      map.appendChild(antenna);
 
-          node.textContent = letter || '·';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('preserveAspectRatio', 'none');
 
-          if (letter && code) {
-            const small = document.createElement('small');
-            small.textContent = code;
-            node.appendChild(small);
+      MAP_LINES.forEach(([a, b]) => {
+        const start = MAP_NODES[a];
+        const end = MAP_NODES[b];
+        if (!start || !end) return;
 
-            node.addEventListener('click', () => {
-              treeSymbols = code;
-              renderMorseTree();
-            });
-          }
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', start.x);
+        line.setAttribute('y1', start.y);
+        line.setAttribute('x2', end.x);
+        line.setAttribute('y2', end.y);
+        line.setAttribute('class', isLineOnPath(a, b) ? 'map-line path' : 'map-line');
+        svg.appendChild(line);
+      });
 
-          rowEl.appendChild(node);
+      map.appendChild(svg);
+
+      Object.entries(MAP_NODES).forEach(([letter, info]) => {
+        const node = document.createElement('button');
+        node.type = 'button';
+        node.className = `map-node ${info.type}`;
+
+        if (isNodeOnPath(info.code)) node.classList.add('path');
+        if (treeSymbols && treeSymbols === info.code) node.classList.add('active');
+
+        node.style.left = info.x + '%';
+        node.style.top = info.y + '%';
+
+        const label = document.createElement('span');
+        label.className = 'letter';
+        label.textContent = letter;
+        node.appendChild(label);
+
+        const code = document.createElement('span');
+        code.className = 'code';
+        code.textContent = info.code;
+        node.appendChild(code);
+
+        node.addEventListener('click', () => {
+          treeSymbols = info.code;
+          renderMorseTree();
         });
 
-        els.morseTree.appendChild(rowEl);
+        map.appendChild(node);
       });
+
+      els.morseTree.appendChild(map);
 
       const liveLetter = REVERSE[treeSymbols] || '';
       els.treePath.textContent = treeSymbols
@@ -937,7 +1056,7 @@
     }
 
     function treeAddSymbol(symbol) {
-      if (treeSymbols.length >= 5) {
+      if (treeSymbols.length >= 4) {
         showToast('That Morse letter is maxed out');
         return;
       }
@@ -1163,6 +1282,7 @@
     document.getElementById('startMicBtn').addEventListener('click', startMicListener);
     document.getElementById('stopMicBtn').addEventListener('click', stopMicListener);
     document.getElementById('resetMicBtn').addEventListener('click', resetMicDecode);
+
     document.getElementById('treeDotBtn').addEventListener('click', () => treeAddSymbol('.'));
     document.getElementById('treeDashBtn').addEventListener('click', () => treeAddSymbol('-'));
     document.getElementById('treeCommitBtn').addEventListener('click', treeCommitLetter);
@@ -1218,6 +1338,7 @@
     loadSettings();
     renderReference();
     renderMorseTree();
+
     els.plainText.value = 'SOS PETE';
     els.morseOutput.textContent = textToMorse(els.plainText.value);
   </script>
